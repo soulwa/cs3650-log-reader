@@ -7,16 +7,17 @@ use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 
 type Canvas = Vec<CanvasPixel>;
+type Artist = u32;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 struct CanvasPixel {
-    artist: u32,
+    artist: Artist,
     coord: Point,
     color: Color,
 }
 
 impl CanvasPixel {
-    fn new(artist: u32, x: i16, y: i16, red: u8, green: u8, blue: u8) -> CanvasPixel {
+    fn new(artist: Artist, x: i16, y: i16, red: u8, green: u8, blue: u8) -> CanvasPixel {
         CanvasPixel {
             artist,
             coord: Point::new(x, y),
@@ -97,7 +98,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // begin analysis
     // initialize all the useful data structures for analysis beforehand
-    let mut posns_map: HashMap<u32, HashSet<Point>> = HashMap::new();
+    let mut posns_map: HashMap<Artist, HashSet<Point>> = HashMap::new();
     println!("Initializing artist and color data...");
     for pixel in &canvas {
         match posns_map.get_mut(&pixel.artist) {
@@ -135,7 +136,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     print_err_msg(check_no_overlapping(&posns_map));
 
     // verify that there are no islands in the log file
-    print_err_msg(check_no_islands(&posns_map));
+    // print_err_msg(check_no_islands(&posns_map));
 
     // double check for artists receiving the same random value. this can be done
     // by analyzing their points, to see if two sets of points are isomorphic
@@ -148,7 +149,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn check_enough_artists(artists: &[&u32], num_artists: usize) -> Result<(), String> {
+fn check_enough_artists(artists: &[&Artist], num_artists: usize) -> Result<(), String> {
     if artists.len() != num_artists {
         Err(format!(
             "Expected {} artists, but found {}; incorrect number of artists painted!",
@@ -162,7 +163,7 @@ fn check_enough_artists(artists: &[&u32], num_artists: usize) -> Result<(), Stri
 }
 
 fn check_all_artists_draw(
-    posns_map: &HashMap<u32, HashSet<Point>>,
+    posns_map: &HashMap<Artist, HashSet<Point>>,
     num_pixels: usize,
 ) -> Result<(), String> {
     println!(
@@ -192,7 +193,7 @@ fn check_all_artists_draw(
 fn check_colors_unique(canvas: &Canvas) -> Result<(), String> {
     println!("Verifying that all artists use unique colors...");
     let mut color_error = false;
-    let mut color_set: HashMap<Color, u32> = HashMap::new();
+    let mut color_set: HashMap<Color, Artist> = HashMap::new();
     for pixel in canvas {
         if let Some(artist) = color_set.get(&pixel.color) {
             if *artist == pixel.artist {
@@ -222,7 +223,7 @@ fn check_colors_unique(canvas: &Canvas) -> Result<(), String> {
     Ok(())
 }
 
-fn check_no_overlapping(posns_map: &HashMap<u32, HashSet<Point>>) -> Result<(), String> {
+fn check_no_overlapping(posns_map: &HashMap<Artist, HashSet<Point>>) -> Result<(), String> {
     println!("Verifying that no artists paint over one another...");
     let mut posn_error = false;
     for (artist, posns) in posns_map.iter() {
@@ -254,30 +255,30 @@ fn check_no_overlapping(posns_map: &HashMap<u32, HashSet<Point>>) -> Result<(), 
     Ok(())
 }
 
-fn check_no_islands(posns_map: &HashMap<u32, HashSet<Point>>) -> Result<(), String> {
+fn check_no_islands(posns_map: &HashMap<Artist, HashSet<Point>>) -> Result<(), String> {
     println!("Verifying that all pixels are connected to pixels of the same color...");
     unimplemented!()
 }
 
-fn check_no_repeating_patterns(posns_map: HashMap<u32, HashSet<Point>>) -> Result<(), String> {
+fn check_no_repeating_patterns(posns_map: HashMap<Artist, HashSet<Point>>) -> Result<(), String> {
     println!("Checking for duplicated artist patterns...");
-    let normalized: Vec<HashSet<Point>> = posns_map
-        .into_values()
-        .map(|set| normalize_points(set).expect("Failed to normalize set: "))
+    let normalized: Vec<(Artist, HashSet<Point>)> = posns_map
+        .into_iter()
+        .map(|(artist, set)| (artist, normalize_points(set).expect("Failed to normalize set: ")))
         .collect();
 
-    let mut duplicates: HashSet<(usize, usize)> = HashSet::new();
-
-    for (ii, set) in normalized.iter().enumerate() {
-        for (jj, other_set) in normalized.iter().enumerate() {
-            if ii == jj {
+    let mut duplicates: HashSet<(Artist, Artist)> = HashSet::new();
+    let mut count = 0;
+    for (artist, set) in normalized.iter() {
+        for (other_artist, other_set) in normalized.iter() {
+            if artist == other_artist {
                 continue;
-            } else if set.is_subset(other_set) && set.is_superset(other_set) {
-                duplicates.insert((min(ii, jj), max(ii, jj)));
-                eprintln!(
-                    "Duplicate pattern found! So far, found {} duplicates",
-                    duplicates.len()
-                );
+            } else if set.is_subset(other_set) && other_set.is_superset(set) {
+                count += 1;
+                let is_new = duplicates.insert((min(*artist, *other_artist), max(*artist, *other_artist)));
+                if is_new {
+                    eprintln!("Duplicate pattern found with artists {} and {}! So far, found {} duplicates", artist, other_artist, duplicates.len());
+                }
             }
         }
     }
@@ -285,7 +286,7 @@ fn check_no_repeating_patterns(posns_map: HashMap<u32, HashSet<Point>>) -> Resul
     if duplicates.is_empty() {
         Ok(())
     } else {
-        Err(format!("Found {} duplicate patterns", duplicates.len()))
+        Err(format!("Found {} duplicate patterns: {} adds", duplicates.len(), count))
     }
 }
 
@@ -313,7 +314,7 @@ fn read_log_to_canvas(lines: Vec<String>) -> Result<Canvas, Box<dyn Error>> {
         if parts.len() != 6 {
             Err("Line is formatted improperly".to_string())?
         }
-        let artist_tid = try_parse::<u32>(parts[0], "artist", lnum)?;
+        let artist_tid = try_parse::<Artist>(parts[0], "artist", lnum)?;
         let x_pos = try_parse::<i16>(parts[1], "x", lnum)?;
         let y_pos = try_parse::<i16>(parts[2], "y", lnum)?;
         let red = try_parse::<u8>(parts[3], "red", lnum)?;
