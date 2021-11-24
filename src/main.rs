@@ -75,13 +75,22 @@ impl Ord for Point {
 // allow specifying file name
 // allow default size to analyze
 fn main() -> Result<(), Box<dyn Error>> {
-    let logfile = match File::open("../a5-sam-gab-swag/canvas.log") {
+    let mut args = std::env::args();
+    args.next();
+    let filepath = if let Some(file) = args.next() {
+        println!("{}", file);
+        file
+    } else {
+        String::from("../canvas.log")
+    };
+
+    let logfile = match File::open(&filepath) {
         Ok(file) => {
-            println!("Successfully found log file {}.", "canvas.log");
+            println!("Successfully found log file {}.", filepath);
             file
         }
         Err(data) => {
-            println!("File {} not found.", "canvas.log");
+            println!("File {} not found.", filepath);
             return Err(data)?;
         }
     };
