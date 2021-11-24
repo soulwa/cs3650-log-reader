@@ -293,6 +293,7 @@ fn check_no_repeating_patterns(posns_map: HashMap<Artist, HashSet<Point>>) -> Re
     }
 
     if duplicates.is_empty() {
+        println!("No duplicate patterns found!");
         Ok(())
     } else {
         Err(format!("Found {} duplicate patterns: {} adds", duplicates.len(), count))
