@@ -74,7 +74,9 @@ impl Ord for Point {
 // allow specifying file name
 // allow default size to analyze
 fn main() -> Result<(), Box<dyn Error>> {
-    let logfile = match File::open("../a5-sam-gab-swag/canvas.log") {
+    let filepath = std::env::args().next().unwrap();
+
+    let logfile = match File::open(filepath) {
         Ok(file) => {
             println!("Successfully found log file {}.", "canvas.log");
             file
@@ -135,7 +137,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     print_err_msg(check_no_overlapping(&posns_map));
 
     // verify that there are no islands in the log file
-    print_err_msg(check_no_islands(&posns_map));
+    // print_err_msg(check_no_islands(&posns_map));
 
     // double check for artists receiving the same random value. this can be done
     // by analyzing their points, to see if two sets of points are isomorphic
